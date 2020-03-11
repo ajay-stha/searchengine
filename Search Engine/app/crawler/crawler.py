@@ -1,43 +1,63 @@
-import json
+import pymongo
 import requests
 from bs4 import BeautifulSoup
-import pymongo
+from urllib import robotparser
+import re
+from includes.urlbreak import get_domain,integrate_link
 
-# start_url = 'https://stackoverflow.com'
+start_url = 'www.daraz.com.np'
 
-class Crawler():
-    #connect to cloud mongo
-    client = pymongo.MongoClient('mongodb+srv://bipul:9818959573@searchengine-ybruq.mongodb.net/khoj?retryWrites=true&w=majority')
+text_tags = ['p', 'h', 'div']
+data = []
+urls=[]
+growth=[]
+ses=[]
+tmp1=[]
+tmp2=[]
 
-    #create db client
-    db = client.khoj
-    #response result storage
-    search_results = []
+#connect to cloud mongo
+client = pymongo.MongoClient('mongodb+srv://bipul:9818959573@searchengine-ybruq.mongodb.net/khoj?retryWrites=true&w=majority')
 
-    #crawl domain
-    def crawl(self, url, depth):
-        #perform HTTP GET request
+#create db client
+db = client.khoj
+
+def crawl(url, depth):
+
+    # Determining DNS
+
+    base_url=get_domain(url=url)
+
+    # Reading robots.txt file
+
+    rp=robotparser.RobotFileParser()
+    rp.set_url(base_url+'robots.txt')
+    rp.read()
+    check1=rp.can_fetch("msnbot",url)
+    check2=rp.can_fetch("*",url)
+    if(check1==True or check2==True):
         try:
             print('Crawling url: "%s" at depth: %d' % (url, depth))
-            response = requests.get(url, headers={'user-agent': 'Khoj.com'})
+            response = requests.get(url)
         except:
             print('failed to perform HTTP GET request on "%s"\n' % url)
             return
-        #parse page content
+
+        # accessing DNS file
+
         content = BeautifulSoup(response.text, 'lxml')
 
-        #try to extract page title and description
         try:
             title = content.find('title').text
             description = ''
             
             for tag in content.find_all():
-                if tag.name == 'p':
-                    description += tag.text.strip().replace('\n', '')
+                if tag.name in text_tags:
+                    description += tag.text.strip().replace('\n', '').replace('\r','')
+                    description=' '.join(description.split())
         except:
             return
 
-        #store the result structure
+        
         result ={
             'url': url,
             'title': title,
@@ -45,49 +65,58 @@ class Crawler():
         }
         #print('\n\nReturn:\n\n',json.dumps(result, indent=2))
 
-        search_results = self.db.search_results
+        search_results =db.search_results
         search_results.insert_one(result)
         search_results.create_index([
             ('url', pymongo.TEXT),
             ('title', pymongo.TEXT),
             ('description', pymongo.TEXT)
         ], name='search_results', default_language='english')
-        
-        
-        #store the result to the data list
-        #self.search_results.append(result)
 
-        #return when the depth is exhausted
-        if depth == 0:
+
+        links = content.find_all('a',href=True)
+
+
+        # urls=list(set([url['href'] for url in links]))
+        tmp=[]
+        tmp=[url['href'] for url in links]
+        urls=[url for url in set(tmp)]
+        growth=integrate_link(base_url=base_url,urls=urls)
+        if(result not in data):
+            data.append(result)
+            if depth == 0:
+                tmp2=[link for link in growth if link not in set(tmp1)]
+                for link in growth:
+                    tmp1.append(link)
+                ses_dict={
+                    'from':url,
+                    'links':tmp2
+                }
+                ses.append(ses_dict)
+                return
+
+            print(str(len(urls))+" anchor tags found")
+            for link in growth:
+                try:
+                    crawl(url=link, depth=depth - 1)
+                except KeyError:
+                    pass
+            
             return
+    else:
+        return
 
-        #extract all the available links on the page
-        links = content.find_all('a')
-
-        #loop over links
-        for link in links:
-            #try to crawl links recursively
-            try:
-                #links with 'http' gets crawled 
-                if 'http' in link['href']:
-                    self.crawl(link['href'], depth - 1)
-            #ignore if any errors
-            except KeyError:
-                pass
-    
-        #close connection
-      
-  
-crawler = Crawler()
-
-crawler.crawl('https://google.com', 5)
+crawl(start_url, 1)
 
 '''with open('data.json', 'w') as json_file:
-    file_content = ''
-    for entry in data:
-        file_content += (json.dumps(entry, indent=2))
 
+    file_content = (json.dumps(data, indent=2))
     json_file.write(file_content)
 
-'''
+print('length of data:', len(data))
+
+with open('ses.json', 'w') as json_ses:
+    list_json=json.dumps(ses,indent=2)
+    json_ses.write(list_json)
 #print(json.dumps(result, indent=2))
+'''
