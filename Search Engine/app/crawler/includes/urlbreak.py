@@ -10,12 +10,19 @@ def get_domain(url):
 			n_st=n_st+'/'
 			check=''
 		base_url=st_n+n_st
+		print(base_url)
 		return base_url
-	elif ('www' in url):
+	elif ('www' in url and '://' not in url):
 		try:
-			check=url[index('/'):]
-			base_url=url[:url.index('/')+1]
-			return base_url
+			if('/' not in url):
+				if('?' in url):
+					return url[:index('?')]+'/'
+				else:
+					return url+'/'
+			else:
+				base_url=url[:url.index('/')+1]
+				print(base_url)
+				return base_url
 		except:
 			return url
 	else:
@@ -28,16 +35,17 @@ def integrate_link(base_url,urls):
 	c=0
 	if(isinstance(urls,list)==True):
 		for link in urls:
-			if(c>=9):
+			if(c>=3):
 				return ses1
 			if(len(link)>1):
+				if(link[0:2]=='//'): #later use regx
+					link=link[2:]
 				if(link[0]=='?'):
 					link=base_url[:-1]+link
 				elif(link[0]=='/'):
+					print(link)
 					link=base_url + link[1:]
-				ses1.append(link)
-				c+=1
-			elif(link[0:3]=='www' or link[0:4]=='http'):
+
 				ses1.append(link)
 				c+=1
 		return ses1

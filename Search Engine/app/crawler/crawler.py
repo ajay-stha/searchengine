@@ -1,11 +1,11 @@
-import pymongo
+import json
 import requests
 from bs4 import BeautifulSoup
 from urllib import robotparser
 import re
 from includes.urlbreak import get_domain,integrate_link
 
-start_url = 'www.daraz.com.np'
+start_url = 'https://www.daraz.com.np/'
 
 text_tags = ['p', 'h', 'div']
 data = []
@@ -14,19 +14,21 @@ growth=[]
 ses=[]
 tmp1=[]
 tmp2=[]
-
-#connect to cloud mongo
-client = pymongo.MongoClient('mongodb+srv://bipul:9818959573@searchengine-ybruq.mongodb.net/khoj?retryWrites=true&w=majority')
-
-#create db client
-db = client.khoj
-
+domain=[]
 def crawl(url, depth):
 
     # Determining DNS
 
     base_url=get_domain(url=url)
-
+    for link in domain:
+        if(base_url in link):
+            if(url[0:2]=='//'):
+                url=link+url[len(base_url)+2:]
+            else:
+                url=link+url[len(base_url):]
+            base_url=link
+    if(base_url not in domain):
+        domain.append(base_url)
     # Reading robots.txt file
 
     rp=robotparser.RobotFileParser()
@@ -65,17 +67,7 @@ def crawl(url, depth):
         }
         #print('\n\nReturn:\n\n',json.dumps(result, indent=2))
 
-        search_results =db.search_results
-        search_results.insert_one(result)
-        search_results.create_index([
-            ('url', pymongo.TEXT),
-            ('title', pymongo.TEXT),
-            ('description', pymongo.TEXT)
-        ], name='search_results', default_language='english')
-
-
         links = content.find_all('a',href=True)
-
 
         # urls=list(set([url['href'] for url in links]))
         tmp=[]
@@ -108,7 +100,7 @@ def crawl(url, depth):
 
 crawl(start_url, 1)
 
-'''with open('data.json', 'w') as json_file:
+with open('data.json', 'w') as json_file:
 
     file_content = (json.dumps(data, indent=2))
     json_file.write(file_content)
@@ -119,4 +111,3 @@ with open('ses.json', 'w') as json_ses:
     list_json=json.dumps(ses,indent=2)
     json_ses.write(list_json)
 #print(json.dumps(result, indent=2))
-'''
