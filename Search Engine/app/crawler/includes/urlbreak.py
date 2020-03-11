@@ -35,7 +35,7 @@ def integrate_link(base_url,urls):
 	c=0
 	if(isinstance(urls,list)==True):
 		for link in urls:
-			if(c>=3):
+			if(c>=50):
 				return ses1
 			if(len(link)>1):
 				if(link[0:2]=='//'): #later use regx
